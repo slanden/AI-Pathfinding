@@ -78,8 +78,9 @@ public class Graph : MonoBehaviour
                 bool walkable = !(Physics.CheckSphere(pos, nodeRadius, unwalkableMask));
 
                 AddNode(iter, o, pos.x, pos.y, walkable);
-                nodes[nodes.Count-1].gridX = (iter + 1) % cols;
-                nodes[nodes.Count-1].gridY = (iter + 1) / cols;
+                nodes[iter].gridX = iter % cols;//(iter + 1) % cols;
+                nodes[iter].gridY = iter / cols;//(iter + 1) / cols;
+                print("Node " + iter + ": (" + nodes[iter].gridX + " , " + nodes[iter].gridY);
                 //print("Node " + nodes[iter].value + " position: " + nodes[iter].position);
 
                 //vertical
@@ -489,8 +490,8 @@ public class Graph : MonoBehaviour
 
                     if (!unexplored.Contains(edge.connection))
                         unexplored.Add(edge.connection);
-                    //else
-                    //    unexplored.UpdateItem(edge.connection);
+                    else
+                        unexplored.UpdateItem(edge.connection);
                 }
             }
         }
