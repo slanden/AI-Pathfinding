@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using System.Diagnostics;
 
 public class Graph : MonoBehaviour
 {
@@ -14,9 +15,15 @@ public class Graph : MonoBehaviour
     List<Node> nodes = new List<Node>();
     
     public float delay = 0.08f;
-    public bool newPath = false;
-    public int startingPt = 0;
-    public int searchMethod = 0;    // 0 = DFS, 1 = BFS, 2 = Dijkstra's, 3 = A*
+    bool newPath = true;
+    public int startPt = 0;
+    public int goalPt = 0;
+    public int searchMethod = 3;    // 0 = DFS, 1 = BFS, 2 = Dijkstra's, 3 = A*
+
+    public int MaxSize
+    {
+        get { return rows * cols; }
+    }
 
     //Gizmo stuff
     public Material expMat, unexpMat, selectMat, startMat;
@@ -58,7 +65,9 @@ public class Graph : MonoBehaviour
             {
                 //float x = (j + 1) * 0.75f / (cols + 1);
                 //float y = (i + 1) * 0.75f / (rows + 1);
-                Vector3 pos = new Vector3(j * 0.75f, i * 0.75f, transform.position.z);
+                Vector3 pos = new Vector3(transform.position.x + j * nodeDiameter + nodeRadius,
+                                          transform.position.y + i * nodeDiameter + nodeRadius, 
+                                          transform.position.z + -0.7f);
                 //float x = j * 0.75f;
                 //float y = i * 0.75f;
 
@@ -69,6 +78,8 @@ public class Graph : MonoBehaviour
                 bool walkable = !(Physics.CheckSphere(pos, nodeRadius, unwalkableMask));
 
                 AddNode(iter, o, pos.x, pos.y, walkable);
+                nodes[nodes.Count-1].gridX = (iter + 1) % cols;
+                nodes[nodes.Count-1].gridY = (iter + 1) / cols;
                 //print("Node " + nodes[iter].value + " position: " + nodes[iter].position);
 
                 //vertical
@@ -130,7 +141,6 @@ public class Graph : MonoBehaviour
                     connectLines.Add(l);
                     connectLines[connectLines.Count - 1].transform.parent = transform;
                 }
-
                 iter++;
             }
         }
@@ -155,173 +165,195 @@ public class Graph : MonoBehaviour
         gridSizeX = Mathf.RoundToInt(gridSize.x / nodeDiameter);    //how many columns fit into gridSize.x (width)
         gridSizeY = Mathf.RoundToInt(gridSize.y / nodeDiameter);    //how many rows fit into gridSize.y (height)
 
+        nodeObj.transform.localScale = new Vector3(nodeRadius, nodeRadius, nodeRadius);
+
         CreateGraph();
 
         container = new GameObject();
         container.name = "Path";
         container.transform.parent = transform;
-
-        //Solver(startingPt, searchMethod);
-        StartCoroutine(FindPath(nodes[0], nodes[26]));
     }
 
-    void OnDrawGizmos()
+    void Update()
     {
-        if (nodes != null)
+        if(newPath == true)
         {
-            foreach (Node n in nodes)
+            newPath = false;
+            startPt = Random.Range(0, MaxSize);
+            goalPt = Random.Range(0, MaxSize);
+            if (goalPt == startPt)
+                goalPt = Random.Range(0, MaxSize);
+
+            foreach(Node n in nodes)
             {
-                Gizmos.color = (n.walkable) ? Color.white : Color.red;
-                Gizmos.DrawCube(n.position, Vector3.one * (nodeDiameter - 0.1f));
+                n.render.GetComponentInChildren<Renderer>().material = unexpMat;
             }
+            Solver(searchMethod);
+                
         }
     }
 
-    void Solver(int start, int method = 0)
+    void Solver(int method = 3)
     {
-        //DFS
-        if(method == 0)
-            StartCoroutine(DFS(start));
+        if (method == 3)
+            StartAStar(nodes[startPt], nodes[goalPt]);
+        if (method == 2)
+            StartDijkstra(nodes[startPt], nodes[goalPt]);
         if (method == 1)
-            StartCoroutine(BFS(start));
-        //if(method == 3)
-        //    StartCoroutine(Solver.)
+            StartBFS(nodes[startPt], nodes[goalPt]);
+        if (method == 0)
+            StartDFS(nodes[startPt], nodes[goalPt]);
+        
     }
 
-    IEnumerator DFS(int startNode)
+    void StartDFS(Node start, Node goal)
     {
+        StartCoroutine(DFS(start, goal));
+    }
+
+    void StartBFS(Node start, Node goal)
+    {
+        StartCoroutine(BFS(start, goal));
+    }
+
+    void StartDijkstra(Node start, Node goal)
+    {
+        StartCoroutine(Dijkstra(start, goal));
+    }
+
+    void StartAStar(Node start, Node goal)
+    {
+        StartCoroutine(AStar(start, goal));
+    }
+
+    IEnumerator DFS(Node startNode, Node goalNode)
+    {
+        if (path != null)
+        {
+            foreach (Transform child in container.transform)
+                Destroy(child.gameObject);
+        }
+
+        foreach (Node n in nodes)
+        {
+            n.gCost = 0;
+            n.parent = null;
+        }
+        
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         Stack<Node> unexplored = new Stack<Node>();
-        List<Node> explored = new List<Node>();
+        HashSet<Node> explored = new HashSet<Node>();
 
-        Node start = nodes[startNode];
-        start.render.GetComponentInChildren<Renderer>().material = startMat;
+        //Node start = nodes[startNode];
+        startNode.render.GetComponentInChildren<Renderer>().material = startMat;
 
-        unexplored.Push(start/*startNode*//*nodes[startNode]*/);
+        unexplored.Push(startNode/*startNode*//*nodes[startNode]*/);
         while (unexplored.Count != 0)
         {
-            Node current = unexplored.Pop();
-            print("Node " + current.id);
+            Node currentNode = unexplored.Pop();
+            explored.Add(currentNode);
 
-            explored.Add(current);
+            if (currentNode == goalNode)
+            {
+                sw.Stop();
+                GetPath(startNode, goalNode);
+                break;
+            }
+
+            //if(startMatSet == false) do below
             //change current node's material to explored (if !startnode)
-            if (current.id != startNode)
-                current.render.GetComponentInChildren<Renderer>().material = expMat;
+            if (currentNode.gridY * cols + currentNode.gridX != startNode.gridY * cols + startNode.gridX)
+                currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
 
             yield return new WaitForSeconds(delay);
 
-            foreach (Edge c in current.connections)
+            foreach (Edge c in currentNode.connections)
             {
-                if (!explored.Contains(c.connection))
+                //if (!explored.Contains(c.connection))
+                //    unexplored.Push(c.connection);
+                if (c.connection.gCost == 0)
                 {
+                    c.connection.gCost = currentNode.gCost + 1;
+                    c.connection.parent = currentNode;
                     unexplored.Push(c.connection);
-                    //print("Add Connection " + c.connection.value);
-                    //yield return new WaitForSeconds(0.5f);
                 }
             }
-            //yield return new WaitForSeconds(delay);
         }
+        yield return new WaitForSeconds(delay * 3);
+        DrawPath(startNode);
+        newPath = true;
     }
 
-    IEnumerator BFS(int startNode)
+    IEnumerator BFS(Node startNode, Node goalNode)
     {
+        if (path != null)
+        {
+            foreach (Transform child in container.transform)
+                Destroy(child.gameObject);
+        }
+
+        foreach (Node n in nodes)
+        {
+            n.gCost = 0;
+            n.parent = null;
+        }
+        
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         Queue<Node> unexplored = new Queue<Node>();
-        List<Node> explored = new List<Node>();
+        HashSet<Node> explored = new HashSet<Node>();
 
-        Node start = nodes[startNode];
-        start.render.GetComponentInChildren<Renderer>().material = startMat;
+        //Node start = nodes[startNode];
+        startNode.render.GetComponentInChildren<Renderer>().material = startMat;
 
-        unexplored.Enqueue(start/*startNode*//*nodes[startNode]*/);
+        unexplored.Enqueue(startNode/*startNode*//*nodes[startNode]*/);
         while (unexplored.Count != 0)
         {
-            Node current = unexplored.Dequeue();
+            Node currentNode = unexplored.Dequeue();
+            explored.Add(currentNode);
 
-            explored.Add(current);
-            //change current node's material to explored (if !startnode)
-            if (current.id != startNode)
-                current.render.GetComponentInChildren<Renderer>().material = expMat;
+            if (currentNode == goalNode)
+            {
+                sw.Stop();
+                GetPath(startNode, goalNode);
+                break;
+            }
+            //if(startMatSet == false) do below
+            //change current node's material to explored (if current index != startNode index)
+            if (currentNode.gridY * cols + currentNode.gridX != startNode.gridY * cols + startNode.gridX)
+                currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
 
             yield return new WaitForSeconds(delay);
 
-            foreach (Edge c in current.connections)
+            foreach (Edge c in currentNode.connections)
             {
-                if (!explored.Contains(c.connection))
+                if (c.connection.gCost == 0 && !explored.Contains(c.connection))
                 {
+                    c.connection.gCost = currentNode.gCost + 1;
+                    c.connection.parent = currentNode;
                     unexplored.Enqueue(c.connection);
-                    //print("Add Connection " + c.connection.value);
-                    //yield return new WaitForSeconds(delay);
                 }
+                    
             }
-            //yield return new WaitForSeconds(delay);
         }
+        yield return new WaitForSeconds(delay * 3);
+        DrawPath(startNode);
+        newPath = true;
     }
 
-    IEnumerator Dijkstra(int startNode,List<Node> potentialEndNodes)
+    IEnumerator Dijkstra(Node startNode, Node goalNode)
     {
-        List<Node> unexplored = new List<Node>();
-        List<Node> explored = new List<Node>();
-
-        Node endNode;
-        Node start = nodes[startNode];
-        start.render.GetComponentInChildren<Renderer>().material = startMat;
-
-        unexplored.Add(start);
-        while (unexplored.Count != 0)
+        if (path != null)
         {
-            Node current = unexplored[0];
-
-            foreach(Node n in potentialEndNodes)
-                if(current.id == n.id)
-                {
-                    endNode = current;
-                    break;
-                }
-            unexplored.Remove(current);
-            explored.Add(current);
-            //change current node's material to explored (if !startnode)
-            if (current.id != startNode)
-                current.render.GetComponentInChildren<Renderer>().material = expMat;
-
-            yield return new WaitForSeconds(delay);
-
-            foreach (Edge c in current.connections)
-            {
-                if (!explored.Contains(c.connection))
-                {
-                    unexplored.Add(c.connection);
-                    //print("Add Connection " + c.connection.value);
-                    //yield return new WaitForSeconds(delay);
-                }
-            }
-            //yield return new WaitForSeconds(delay);
+            foreach (Transform child in container.transform)
+                Destroy(child.gameObject);
         }
-    }
-
-    //List<Node> GetNeighbors(Node node)
-    //{
-    //    List<Node> neighbors = new List<Node>();
-
-    //    for (int x = -1; x <= 1; ++x)
-    //    {
-    //        for (int y = -1; y <= 1; ++y)
-    //        {
-    //            if (x == 0 && y == 0)
-    //                continue;
-
-    //            int checkX = node.gridX + x;
-    //            int checkY = node.gridY + y;
-
-    //            if(checkX >= 0 && checkX < gridSizeX && checkY >= 0 && checkY < gridSizeY)
-    //                //neighbors.Add()
-    //        }
-    //    }
-
-    //    return neighbors;
-    //}
-
-    public IEnumerator FindPath(Node startNode, Node goalNode)
-    {
-        List<Node> unexplored = new List<Node>();
-        List<Node> explored = new List<Node>();
+        
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
+        Heap<Node> unexplored = new Heap<Node>(MaxSize);
+        HashSet<Node> explored = new HashSet<Node>();   //HashSet ~1600% faster than list in this case
 
         //set startNode material
         startNode.render.GetComponentInChildren<Renderer>().material = startMat;
@@ -329,21 +361,23 @@ public class Graph : MonoBehaviour
         unexplored.Add(startNode);
         while (unexplored.Count != 0)
         {
+            //Node currentNode = unexplored[0];
+            ////sort by lowest fCost
+            //for (int i = 1; i < currentNode.fCost; ++i)
+            //{
+            //    if (unexplored[i].fCost < currentNode.fCost ||
+            //        unexplored[i].fCost == currentNode.fCost && unexplored[i].hCost < currentNode.hCost)
+            //        currentNode = unexplored[i];
+            //}
 
-            Node currentNode = unexplored[0];
-            //sort by lowest fCost
-            for(int i = 1; i < currentNode.fCost; ++i)
-            {
-                if (unexplored[i].fCost < currentNode.fCost || 
-                    unexplored[i].fCost == currentNode.fCost && unexplored[i].hCost < currentNode.hCost)
-                    currentNode = unexplored[i];
-            }
+            //unexplored.Remove(currentNode);
 
-            unexplored.Remove(currentNode);
+            Node currentNode = unexplored.RemoveFirst();
             explored.Add(currentNode);
 
             if (currentNode == goalNode)
             {
+                sw.Stop();
                 GetPath(startNode, goalNode);
                 break;
             }
@@ -369,37 +403,147 @@ public class Graph : MonoBehaviour
 
                     if (!unexplored.Contains(edge.connection))
                         unexplored.Add(edge.connection);
-                }                
+                    //else
+                    //    unexplored.UpdateItem(edge.connection);
+                }
             }
-            //yield return new WaitForSeconds(delay);
         }
-        //print("Coroutine Finished 1");
-        //yield return null;
 
         //pause before displaying path
-        yield return new WaitForSeconds(delay * 3);
+        yield return new WaitForSeconds(delay * 6);
 
+        //if (path != null)
+        //{
+        //    foreach (Transform child in container.transform)
+        //        Destroy(child.gameObject);
+
+        //    path.Insert(0, startNode);
+        //    for (int i = 0; i < path.Count; ++i)
+        //    {
+        //        if (i == 0)
+        //            continue;
+
+        //        GameObject g = Instantiate(line);
+        //        LineRenderer l = g.GetComponent<LineRenderer>();
+        //        Color c = new Color(255, 0, 0, 128);
+        //        l.SetColors(c,c);
+        //        l.SetWidth(0.2f, 0.2f);
+        //        l.SetPosition(0, path[i - 1].render.transform.position);
+        //        l.SetPosition(1, path[i].render.transform.position);
+        //        connectLines.Add(l);
+        //        connectLines[connectLines.Count - 1].transform.parent = container.transform;
+        //    }
+        //}
+        //newPath = true;
+        DrawPath(startNode);
+        newPath = true;
+    }
+
+    IEnumerator AStar(Node startNode, Node goalNode)
+    {
         if (path != null)
         {
             foreach (Transform child in container.transform)
                 Destroy(child.gameObject);
+        }
+        
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
+        Heap<Node> unexplored = new Heap<Node>(MaxSize);
+        HashSet<Node> explored = new HashSet<Node>();   //HashSet ~1600% faster than list in this case
 
-            path.Insert(0, startNode);
-            for (int i = 0; i < path.Count; ++i)
+        //set startNode material
+        startNode.render.GetComponentInChildren<Renderer>().material = startMat;
+        goalNode.render.GetComponentInChildren<Renderer>().material = selectMat;
+
+        unexplored.Add(startNode);
+        while (unexplored.Count != 0)
+        {
+            Node currentNode = unexplored.RemoveFirst();
+            explored.Add(currentNode);
+            if (currentNode == goalNode)
             {
-                if (i == 0)
+                sw.Stop();
+                GetPath(startNode, goalNode);
+                break;
+            }
+
+            //change current node's material to explored (if !startnode)
+            if (currentNode != startNode && currentNode != goalNode)
+                currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
+
+            yield return new WaitForSeconds(delay);
+
+            foreach (Edge edge in currentNode.connections)
+            {
+                if (!edge.connection.walkable || explored.Contains(edge.connection))
                     continue;
 
-                GameObject g = Instantiate(line);
-                LineRenderer l = g.GetComponent<LineRenderer>();
-                l.SetColors(Color.red, Color.red);
-                l.SetPosition(0, path[i - 1].render.transform.position);
-                l.SetPosition(1, path[i].render.transform.position);
-                connectLines.Add(l);
-                connectLines[connectLines.Count - 1].transform.parent = container.transform;
+                int newGCost = currentNode.gCost + GetDistance(currentNode, edge.connection);
+                if (newGCost < edge.connection.gCost || !unexplored.Contains(edge.connection))
+                {
+                    edge.connection.gCost = newGCost;
+                    edge.connection.hCost = GetDistance(edge.connection, goalNode);
+                    //edge.connection.fCost = edge.connection.gCost + edge.connection.hCost;
+                    edge.connection.parent = currentNode;
+
+                    if (!unexplored.Contains(edge.connection))
+                        unexplored.Add(edge.connection);
+                    //else
+                    //    unexplored.UpdateItem(edge.connection);
+                }
             }
         }
 
+        //pause before displaying path
+        yield return new WaitForSeconds(delay * 3);
+
+        //if (path != null)
+        //{
+        //    foreach (Transform child in container.transform)
+        //        Destroy(child.gameObject);
+
+        //    path.Insert(0, startNode);
+        //    for (int i = 0; i < path.Count; ++i)
+        //    {
+        //        if (i == 0)
+        //            continue;
+
+        //        GameObject g = Instantiate(line);
+        //        LineRenderer l = g.GetComponent<LineRenderer>();
+        //        Color c = new Color(255, 0, 0, 128);
+        //        l.SetColors(c, c);
+        //        l.SetWidth(0.2f, 0.2f);
+        //        l.SetPosition(0, path[i - 1].render.transform.position);
+        //        l.SetPosition(1, path[i].render.transform.position);
+        //        connectLines.Add(l);
+        //        connectLines[connectLines.Count - 1].transform.parent = container.transform;
+        //    }
+        //}
+        //newPath = true;
+        DrawPath(startNode);
+        yield return new WaitForSeconds(delay * 6);
+        newPath = true;
+    }
+
+    void DrawPath(Node start)
+    {
+        path.Insert(0, start);
+        for (int i = 0; i < path.Count; ++i)
+        {
+            if (i == 0)
+                continue;
+
+            GameObject g = Instantiate(line);
+            LineRenderer l = g.GetComponent<LineRenderer>();
+            Color c = new Color(255, 0, 0, 128);
+            l.SetColors(c, c);
+            l.SetWidth(0.2f, 0.2f);
+            l.SetPosition(0, path[i - 1].render.transform.position);
+            l.SetPosition(1, path[i].render.transform.position);
+            connectLines.Add(l);
+            connectLines[connectLines.Count - 1].transform.parent = container.transform;
+        }
     }
 
     void GetPath(Node startNode, Node endNode)
@@ -414,8 +558,22 @@ public class Graph : MonoBehaviour
         _path.Reverse();
         path = _path;
         
-        endNode.render.GetComponentInChildren<Renderer>().material = selectMat;
+        //endNode.render.GetComponentInChildren<Renderer>().material = selectMat;
+    }    
+
+    int GetDistance(Node a, Node b)
+    {
+        //return Mathf.RoundToInt(Vector3.Distance(a.position, b.position));
+        int distX = Mathf.Abs(a.gridX - b.gridX);
+        int distY = Mathf.Abs(a.gridY - b.gridY);
+
+        //10 and 14 come from the root where a straight line is
+        // 1 and a diagonal line is the square of 2
+        if (distX > distY)
+            return 14 * distY + 10 * (distX - distY);
+        return 14 * distX + 10 * (distY - distX);
     }
+
 
     int GetDistance_2DListNode(Node a, Node b)
     {
@@ -427,8 +585,25 @@ public class Graph : MonoBehaviour
         return 14 * distX + 10 * (distY - distX);
     }
 
-    int GetDistance(Node a, Node b)
-    {
-        return Mathf.RoundToInt(Vector3.Distance(a.position, b.position));
-    }
+    //List<Node> GetNeighbors(Node node)
+    //{
+    //    List<Node> neighbors = new List<Node>();
+
+    //    for (int x = -1; x <= 1; ++x)
+    //    {
+    //        for (int y = -1; y <= 1; ++y)
+    //        {
+    //            if (x == 0 && y == 0)
+    //                continue;
+
+    //            int checkX = node.gridX + x;
+    //            int checkY = node.gridY + y;
+
+    //            if(checkX >= 0 && checkX < gridSizeX && checkY >= 0 && checkY < gridSizeY)
+    //                //neighbors.Add()
+    //        }
+    //    }
+
+    //    return neighbors;
+    //}
 }

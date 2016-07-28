@@ -63,10 +63,10 @@ LineRenderer:
     endWidth: 0.04
     m_StartColor:
       serializedVersion: 2
-      rgba: 4286743170
+      rgba: 4280032284
     m_EndColor:
       serializedVersion: 2
-      rgba: 4286743170
+      rgba: 4280032284
   m_UseWorldSpace: 1
 --- !u!1001 &100100000
 Prefab:
