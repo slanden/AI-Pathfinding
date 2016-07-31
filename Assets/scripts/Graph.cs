@@ -16,8 +16,8 @@ public class Graph : MonoBehaviour
     
     public float delay = 0.08f;
     bool newPath = true;
-    public int startPt = 0;
-    public int goalPt = 0;
+    int startPt = 0;
+    int goalPt = 0;
     public int searchMethod = 3;    // 0 = DFS, 1 = BFS, 2 = Dijkstra's, 3 = A*
 
     public int MaxSize
@@ -27,7 +27,7 @@ public class Graph : MonoBehaviour
 
     //Gizmo stuff
     public Material expMat, unexpMat, selectMat, startMat;
-    public List<LineRenderer> connectLines = new List<LineRenderer>();
+    List<LineRenderer> connectLines = new List<LineRenderer>();
     public GameObject nodeObj;
     public GameObject line;    
     GameObject container;   //container for holding path linerenderers
@@ -68,8 +68,6 @@ public class Graph : MonoBehaviour
                 Vector3 pos = new Vector3(transform.position.x + j * nodeDiameter + nodeRadius,
                                           transform.position.y + i * nodeDiameter + nodeRadius, 
                                           transform.position.z + -0.7f);
-                //float x = j * 0.75f;
-                //float y = i * 0.75f;
 
                 GameObject o = Instantiate(nodeObj, pos, Quaternion.identity) as GameObject;
                 o.transform.parent = transform;
@@ -80,8 +78,6 @@ public class Graph : MonoBehaviour
                 AddNode(iter, o, pos.x, pos.y, walkable);
                 nodes[iter].gridX = iter % cols;//(iter + 1) % cols;
                 nodes[iter].gridY = iter / cols;//(iter + 1) / cols;
-                print("Node " + iter + ": (" + nodes[iter].gridX + " , " + nodes[iter].gridY);
-                //print("Node " + nodes[iter].value + " position: " + nodes[iter].position);
 
                 //vertical
                 if (i != 0)
@@ -245,11 +241,11 @@ public class Graph : MonoBehaviour
         sw.Start();
         Stack<Node> unexplored = new Stack<Node>();
         HashSet<Node> explored = new HashSet<Node>();
-
-        //Node start = nodes[startNode];
+        
         startNode.render.GetComponentInChildren<Renderer>().material = startMat;
+        goalNode.render.GetComponentInChildren<Renderer>().material = selectMat;
 
-        unexplored.Push(startNode/*startNode*//*nodes[startNode]*/);
+        unexplored.Push(startNode);
         while (unexplored.Count != 0)
         {
             Node currentNode = unexplored.Pop();
@@ -261,18 +257,15 @@ public class Graph : MonoBehaviour
                 GetPath(startNode, goalNode);
                 break;
             }
-
-            //if(startMatSet == false) do below
+            
             //change current node's material to explored (if !startnode)
-            if (currentNode.gridY * cols + currentNode.gridX != startNode.gridY * cols + startNode.gridX)
+            if (currentNode != startNode && currentNode != goalNode)
                 currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
 
             yield return new WaitForSeconds(delay);
 
             foreach (Edge c in currentNode.connections)
             {
-                //if (!explored.Contains(c.connection))
-                //    unexplored.Push(c.connection);
                 if (c.connection.gCost == 0)
                 {
                     c.connection.gCost = currentNode.gCost + 1;
@@ -281,8 +274,10 @@ public class Graph : MonoBehaviour
                 }
             }
         }
+
         yield return new WaitForSeconds(delay * 3);
         DrawPath(startNode);
+        yield return new WaitForSeconds(delay * 6);
         newPath = true;
     }
 
@@ -304,11 +299,11 @@ public class Graph : MonoBehaviour
         sw.Start();
         Queue<Node> unexplored = new Queue<Node>();
         HashSet<Node> explored = new HashSet<Node>();
-
-        //Node start = nodes[startNode];
+        
         startNode.render.GetComponentInChildren<Renderer>().material = startMat;
+        goalNode.render.GetComponentInChildren<Renderer>().material = selectMat;
 
-        unexplored.Enqueue(startNode/*startNode*//*nodes[startNode]*/);
+        unexplored.Enqueue(startNode);
         while (unexplored.Count != 0)
         {
             Node currentNode = unexplored.Dequeue();
@@ -320,9 +315,9 @@ public class Graph : MonoBehaviour
                 GetPath(startNode, goalNode);
                 break;
             }
-            //if(startMatSet == false) do below
+
             //change current node's material to explored (if current index != startNode index)
-            if (currentNode.gridY * cols + currentNode.gridX != startNode.gridY * cols + startNode.gridX)
+            if (currentNode != startNode && currentNode != goalNode)
                 currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
 
             yield return new WaitForSeconds(delay);
@@ -338,8 +333,10 @@ public class Graph : MonoBehaviour
                     
             }
         }
+
         yield return new WaitForSeconds(delay * 3);
         DrawPath(startNode);
+        yield return new WaitForSeconds(delay * 6);
         newPath = true;
     }
 
@@ -358,21 +355,11 @@ public class Graph : MonoBehaviour
 
         //set startNode material
         startNode.render.GetComponentInChildren<Renderer>().material = startMat;
+        goalNode.render.GetComponentInChildren<Renderer>().material = selectMat;
 
         unexplored.Add(startNode);
         while (unexplored.Count != 0)
         {
-            //Node currentNode = unexplored[0];
-            ////sort by lowest fCost
-            //for (int i = 1; i < currentNode.fCost; ++i)
-            //{
-            //    if (unexplored[i].fCost < currentNode.fCost ||
-            //        unexplored[i].fCost == currentNode.fCost && unexplored[i].hCost < currentNode.hCost)
-            //        currentNode = unexplored[i];
-            //}
-
-            //unexplored.Remove(currentNode);
-
             Node currentNode = unexplored.RemoveFirst();
             explored.Add(currentNode);
 
@@ -384,7 +371,7 @@ public class Graph : MonoBehaviour
             }
 
             //change current node's material to explored (if !startnode)
-            if (currentNode != startNode)
+            if (currentNode != startNode && currentNode != goalNode)
                 currentNode.render.GetComponentInChildren<Renderer>().material = expMat;
 
             yield return new WaitForSeconds(delay);
@@ -398,45 +385,21 @@ public class Graph : MonoBehaviour
                 if (newGCost < edge.connection.gCost || !unexplored.Contains(edge.connection))
                 {
                     edge.connection.gCost = newGCost;
-                    edge.connection.hCost = 0;//GetDistance(edge.connection, goalNode);
-                    //edge.connection.fCost = edge.connection.gCost + edge.connection.hCost;
+                    edge.connection.hCost = 0;
                     edge.connection.parent = currentNode;
 
                     if (!unexplored.Contains(edge.connection))
                         unexplored.Add(edge.connection);
-                    //else
-                    //    unexplored.UpdateItem(edge.connection);
+                    else
+                        unexplored.UpdateItem(edge.connection);
                 }
             }
         }
 
         //pause before displaying path
-        yield return new WaitForSeconds(delay * 6);
-
-        //if (path != null)
-        //{
-        //    foreach (Transform child in container.transform)
-        //        Destroy(child.gameObject);
-
-        //    path.Insert(0, startNode);
-        //    for (int i = 0; i < path.Count; ++i)
-        //    {
-        //        if (i == 0)
-        //            continue;
-
-        //        GameObject g = Instantiate(line);
-        //        LineRenderer l = g.GetComponent<LineRenderer>();
-        //        Color c = new Color(255, 0, 0, 128);
-        //        l.SetColors(c,c);
-        //        l.SetWidth(0.2f, 0.2f);
-        //        l.SetPosition(0, path[i - 1].render.transform.position);
-        //        l.SetPosition(1, path[i].render.transform.position);
-        //        connectLines.Add(l);
-        //        connectLines[connectLines.Count - 1].transform.parent = container.transform;
-        //    }
-        //}
-        //newPath = true;
+        yield return new WaitForSeconds(delay * 3);
         DrawPath(startNode);
+        yield return new WaitForSeconds(delay * 6);        
         newPath = true;
     }
 
@@ -453,7 +416,7 @@ public class Graph : MonoBehaviour
         Heap<Node> unexplored = new Heap<Node>(MaxSize);
         HashSet<Node> explored = new HashSet<Node>();   //HashSet ~1600% faster than list in this case
 
-        //set startNode material
+        //set startNode & goalNode material
         startNode.render.GetComponentInChildren<Renderer>().material = startMat;
         goalNode.render.GetComponentInChildren<Renderer>().material = selectMat;
 
@@ -485,7 +448,6 @@ public class Graph : MonoBehaviour
                 {
                     edge.connection.gCost = newGCost;
                     edge.connection.hCost = GetDistance(edge.connection, goalNode);
-                    //edge.connection.fCost = edge.connection.gCost + edge.connection.hCost;
                     edge.connection.parent = currentNode;
 
                     if (!unexplored.Contains(edge.connection))
@@ -498,30 +460,6 @@ public class Graph : MonoBehaviour
 
         //pause before displaying path
         yield return new WaitForSeconds(delay * 3);
-
-        //if (path != null)
-        //{
-        //    foreach (Transform child in container.transform)
-        //        Destroy(child.gameObject);
-
-        //    path.Insert(0, startNode);
-        //    for (int i = 0; i < path.Count; ++i)
-        //    {
-        //        if (i == 0)
-        //            continue;
-
-        //        GameObject g = Instantiate(line);
-        //        LineRenderer l = g.GetComponent<LineRenderer>();
-        //        Color c = new Color(255, 0, 0, 128);
-        //        l.SetColors(c, c);
-        //        l.SetWidth(0.2f, 0.2f);
-        //        l.SetPosition(0, path[i - 1].render.transform.position);
-        //        l.SetPosition(1, path[i].render.transform.position);
-        //        connectLines.Add(l);
-        //        connectLines[connectLines.Count - 1].transform.parent = container.transform;
-        //    }
-        //}
-        //newPath = true;
         DrawPath(startNode);
         yield return new WaitForSeconds(delay * 6);
         newPath = true;
@@ -558,29 +496,15 @@ public class Graph : MonoBehaviour
         }
         _path.Reverse();
         path = _path;
-        
-        //endNode.render.GetComponentInChildren<Renderer>().material = selectMat;
     }    
 
     int GetDistance(Node a, Node b)
     {
-        //return Mathf.RoundToInt(Vector3.Distance(a.position, b.position));
         int distX = Mathf.Abs(a.gridX - b.gridX);
         int distY = Mathf.Abs(a.gridY - b.gridY);
 
         //10 and 14 come from the root where a straight line is
         // 1 and a diagonal line is the square of 2
-        if (distX > distY)
-            return 14 * distY + 10 * (distX - distY);
-        return 14 * distX + 10 * (distY - distX);
-    }
-
-
-    int GetDistance_2DListNode(Node a, Node b)
-    {
-        int distX = Mathf.Abs(a.gridX - b.gridX);
-        int distY = Mathf.Abs(a.gridY - b.gridY);
-
         if (distX > distY)
             return 14 * distY + 10 * (distX - distY);
         return 14 * distX + 10 * (distY - distX);
