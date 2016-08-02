@@ -436,7 +436,7 @@ PlayerSettings:
   WebGL::ScriptingBackend: 1
   WebGL::audioCompressionFormat: 4
   WebGL::exceptionSupport: 0
-  WebGL::memorySize: 256
+  WebGL::memorySize: 32
   WebPlayer::ScriptingBackend: 0
   boolPropertyNames:
   - WebGL::analyzeBuildSize
@@ -452,7 +452,7 @@ PlayerSettings:
   - WebGL::template
   - additionalIl2CppArgs::additionalIl2CppArgs
   WebGL::emscriptenArgs: 
-  WebGL::template: APPLICATION:Default
+  WebGL::template: PROJECT:Custom
   additionalIl2CppArgs::additionalIl2CppArgs: 
   cloudProjectId: 
   projectName: 
