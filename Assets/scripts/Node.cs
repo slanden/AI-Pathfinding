@@ -12,7 +12,7 @@ public class Node : IHeapItem<Node>
     public int id;
     public int heapIndex;
 
-    //for some reason without these, using distance instead,
+    //without these, using distance instead,
     //the algorithm doesn't find shortest path
     public int gridX;
     public int gridY;
@@ -45,6 +45,8 @@ public class Node : IHeapItem<Node>
         }
     }
 
+    //extends int.CompareTo to take in a node and 
+    //compare the int value of fCost & hCost
     public int CompareTo(Node nodeToCompare)
     {
         int compare = fCost.CompareTo(nodeToCompare.fCost);
@@ -52,7 +54,7 @@ public class Node : IHeapItem<Node>
         {
             compare = hCost.CompareTo(nodeToCompare.hCost);
         }
-        // integer.CompareTo returns 1 if integer is higher.
+        // int.CompareTo returns 1 if integer is higher.
         // we want to return 1 if integer is lower, so we negate.
         return -compare;
     }

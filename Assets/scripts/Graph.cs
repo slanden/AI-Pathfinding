@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿/*To Do: Decouple all pathfinding logic from graph logic*/
+
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;

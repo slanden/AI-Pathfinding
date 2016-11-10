@@ -1,4 +1,8 @@
-﻿using UnityEngine;
+﻿/* Usage:
+    Attach this script to an empty game object to control the simulation.
+ */
+
+using UnityEngine;
 using UnityEngine.UI;
 
 public class Main : MonoBehaviour

@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 
 public class Solver : MonoBehaviour
@@ -30,7 +29,8 @@ public class Solver : MonoBehaviour
 
             for(int i = 1; i < unexplored.Count; ++i)
             {
-                if(unexplored[i].fCost < current.fCost || unexplored[i].fCost == current.fCost && unexplored[i].hCost < current.hCost)
+                if(unexplored[i].fCost < current.fCost || 
+                   unexplored[i].fCost == current.fCost && unexplored[i].hCost < current.hCost)
                 {
                     current = unexplored[i];
                 }
